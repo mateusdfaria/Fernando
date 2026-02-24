@@ -31,7 +31,7 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
   const [nameEdit, setNameEdit] = useState('');
   const [assistantEnabled, setAssistantEnabled] = useState(true);
   const [categoriesList, setCategoriesList] = useState([]);
-  const [now, setNow] = useState(Date.now());
+  const [, setNow] = useState(Date.now());
 
   const loadCategories = async () => {
     try {
@@ -185,6 +185,7 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
 
   useEffect(() => {
     loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
