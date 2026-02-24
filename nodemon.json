@@ -1,0 +1,12 @@
+{
+    "ignore": [
+        "baileys_auth_info",
+        "baileys_auth_info/**",
+        "server/baileys_auth_info",
+        "server/baileys_auth_info/**",
+        "server/database.sqlite",
+        "client",
+        "client/**"
+    ],
+    "ext": "js,json,mjs,cjs"
+}

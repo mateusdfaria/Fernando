@@ -1,0 +1,164 @@
+.scheduled-messages-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.schedule-form {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.schedule-form .form-group {
+    margin-bottom: 16px;
+}
+
+.schedule-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+.schedule-form input[type="text"],
+.schedule-form input[type="datetime-local"],
+.schedule-form textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.schedule-form input:focus,
+.schedule-form textarea:focus {
+    outline: none;
+    border-color: #25D366;
+    box-shadow: 0 0 0 2px rgba(37, 211, 102, 0.2);
+}
+
+.schedule-form small {
+    display: block;
+    margin-top: 4px;
+    color: #666;
+    font-size: 12px;
+}
+
+.form-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-refresh {
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 16px;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.btn-refresh:hover {
+    background-color: #e0e0e0;
+}
+
+.messages-table-container {
+    overflow-x: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+}
+
+.messages-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.messages-table th,
+.messages-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+}
+
+.messages-table th {
+    background-color: #f9f9f9;
+    font-weight: 600;
+    color: #333;
+}
+
+.messages-table tbody tr:hover {
+    background-color: #fdfdfd;
+}
+
+.phones-list {
+    max-width: 200px;
+    word-break: break-all;
+    font-size: 13px;
+}
+
+.message-preview {
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #555;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-badge.pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.sent {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-badge.error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.error-info {
+    font-size: 12px;
+    color: #dc3545;
+    margin-top: 4px;
+    cursor: help;
+}
+
+.btn-delete-small {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.btn-delete-small:hover {
+    background-color: #fee2e2;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border: 1px dashed #ddd;
+}

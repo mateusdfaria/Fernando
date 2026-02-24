@@ -1,0 +1,101 @@
+.menu-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.menu-option-card {
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 20px;
+  transition: all 0.3s;
+}
+
+.menu-option-card:hover {
+  border-color: #2d6a4f;
+  box-shadow: 0 5px 15px rgba(45, 106, 79, 0.1);
+}
+
+.option-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.option-number {
+  background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.option-title {
+  color: #333;
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.option-message {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  white-space: pre-wrap;
+  color: #555;
+  line-height: 1.6;
+}
+
+.option-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btn-action {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.btn-edit {
+  background: #2d6a4f;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #1b4332;
+  transform: translateY(-2px);
+}
+
+.btn-delete {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #c82333;
+  transform: translateY(-2px);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.empty-state p {
+  margin: 10px 0;
+  font-size: 1.1rem;
+}

@@ -1,0 +1,145 @@
+.whatsapp-status {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.whatsapp-status.connected .status-dot {
+  background-color: #25d366;
+  box-shadow: 0 0 10px rgba(37, 211, 102, 0.5);
+}
+
+.whatsapp-status.disconnected .status-dot {
+  background-color: #dc3545;
+  box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+}
+
+.status-text {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.status-message {
+  margin-top: 10px;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.qr-code-section {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+  padding: 20px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.qr-code-image {
+  max-width: 300px;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.qr-instructions {
+  margin-top: 15px;
+  color: #555;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  text-align: left;
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.qr-instructions strong {
+  color: #2d6a4f;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.status-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-connect,
+.btn-disconnect {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.btn-connect {
+  background-color: #25d366;
+  color: white;
+}
+
+.btn-connect:hover {
+  background-color: #20b85a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+}
+
+.btn-disconnect {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-disconnect:hover {
+  background-color: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.btn-connect:disabled,
+.btn-disconnect:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
