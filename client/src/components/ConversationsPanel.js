@@ -58,6 +58,17 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
     }
   };
 
+  const loadConversationMessagesSilent = async (conversationId) => {
+    try {
+      const res = await axios.get(`${apiUrl}/conversations/${conversationId}/messages`);
+      setMessages(res.data.messages || []);
+      // Atualizar count como lida também de forma silenciosa e a lista nas conversas
+      await axios.post(`${apiUrl}/conversations/${conversationId}/read`);
+    } catch (err) {
+      console.error('Erro ao recarregar mensagens da conversa silentmente:', err);
+    }
+  };
+
   const loadConversationMessages = async (conversation) => {
     try {
       setLoadingMessages(true);
@@ -71,11 +82,24 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
       // Marcar como lida
       await axios.post(`${apiUrl}/conversations/${conversation.id}/read`);
       // Atualizar lista de conversas (para zerar unread_count)
-      loadConversations();
+      loadConversationsSilent();
     } catch (err) {
       console.error('Erro ao carregar mensagens da conversa:', err);
     } finally {
       setLoadingMessages(false);
+    }
+  };
+
+  const loadConversationsSilent = async () => {
+    try {
+      const params = {};
+      if (categoryFilter) {
+        params.category = categoryFilter;
+      }
+      const res = await axios.get(`${apiUrl}/conversations`, { params });
+      setConversations(res.data || []);
+    } catch (err) {
+      console.error('Erro ao carregar conversas via silent poll:', err);
     }
   };
 
@@ -190,11 +214,21 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
 
   useEffect(() => {
     loadConversations();
-    // Opcional: auto-refresh a cada X segundos
-    const interval = setInterval(loadConversations, 10000);
+    // Auto-refresh a cada 5 segundos da lista de conversas de forma silenciosa
+    const interval = setInterval(loadConversationsSilent, 5000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryFilter]);
+
+  useEffect(() => {
+    let interval;
+    if (selectedConversation) {
+      interval = setInterval(() => {
+        loadConversationMessagesSilent(selectedConversation.id);
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [selectedConversation?.id]);
 
   useEffect(() => {
     if (initialConversation && onClearInitialConversation) {

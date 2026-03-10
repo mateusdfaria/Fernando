@@ -37,7 +37,9 @@ const ScheduledMessagesPanel = ({ apiUrl }) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            await axios.post(`${apiUrl}/scheduled-messages`, formData);
+            const dateObj = new Date(formData.scheduled_at);
+            const utcDateStr = dateObj.toISOString();
+            await axios.post(`${apiUrl}/scheduled-messages`, { ...formData, scheduled_at: utcDateStr });
             setFormData({ phones: '', message: '', scheduled_at: '' });
             loadMessages();
             alert('Mensagem agendada com sucesso!');
@@ -60,7 +62,14 @@ const ScheduledMessagesPanel = ({ apiUrl }) => {
     };
 
     const formatDateTime = (dateString) => {
-        const date = new Date(dateString);
+        let cleanStr = dateString;
+        if (!cleanStr.includes('T')) {
+            cleanStr = cleanStr.replace(' ', 'T');
+        }
+        if (!cleanStr.endsWith('Z')) {
+            cleanStr += 'Z';
+        }
+        const date = new Date(cleanStr);
         return date.toLocaleString('pt-BR');
     };
 
