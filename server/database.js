@@ -717,14 +717,23 @@ function getScheduledMessages() {
 
 function getPendingScheduledMessages() {
   return new Promise((resolve, reject) => {
-    // Generate UTC string from Node.js current time, formatted as YYYY-MM-DD HH:mm:ss
-    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    // Fetch all pending and filter by time in JS to avoid timezone issues
     db.all(
-      `SELECT * FROM scheduled_messages WHERE status = 'pending' AND scheduled_at <= ?`,
-      [nowStr],
+      `SELECT * FROM scheduled_messages WHERE status = 'pending'`,
       (err, rows) => {
-        if (err) reject(err);
-        else resolve((rows || []).map(r => ({ ...r, phones: JSON.parse(r.phones || '[]') })));
+        if (err) { reject(err); return; }
+        const nowMs = Date.now();
+        const due = (rows || []).filter(r => {
+          // scheduled_at is stored as ISO string (e.g. '2026-03-11 17:20:00')
+          // Make it parseable by JS: replace space with T and append Z (UTC)
+          let dtStr = (r.scheduled_at || '').trim();
+          if (!dtStr.includes('T')) dtStr = dtStr.replace(' ', 'T');
+          if (!dtStr.endsWith('Z')) dtStr += 'Z';
+          const scheduledMs = new Date(dtStr).getTime();
+          console.log(`[Scheduler] Msg #${r.id} scheduled_at='${r.scheduled_at}' scheduledMs=${scheduledMs} nowMs=${nowMs} due=${scheduledMs <= nowMs}`);
+          return scheduledMs <= nowMs;
+        });
+        resolve(due.map(r => ({ ...r, phones: JSON.parse(r.phones || '[]') })));
       }
     );
   });
