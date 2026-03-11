@@ -37,8 +37,14 @@ const ScheduledMessagesPanel = ({ apiUrl }) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            const dateObj = new Date(formData.scheduled_at);
-            const utcDateStr = dateObj.toISOString();
+            // Parse datetime-local value manually to avoid browser timezone ambiguity.
+            // "2026-03-11T14:41" split into parts and passed as individual arguments
+            // to Date() constructor, which ALWAYS interprets them as local time.
+            const [datePart, timePart] = formData.scheduled_at.split('T');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const [hours, minutes] = timePart.split(':').map(Number);
+            const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+            const utcDateStr = localDate.toISOString(); // correct UTC representation
             await axios.post(`${apiUrl}/scheduled-messages`, { ...formData, scheduled_at: utcDateStr });
             setFormData({ phones: '', message: '', scheduled_at: '' });
             loadMessages();
