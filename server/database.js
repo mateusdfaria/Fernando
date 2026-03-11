@@ -717,8 +717,11 @@ function getScheduledMessages() {
 
 function getPendingScheduledMessages() {
   return new Promise((resolve, reject) => {
+    // Generate UTC string from Node.js current time, formatted as YYYY-MM-DD HH:mm:ss
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
     db.all(
-      `SELECT * FROM scheduled_messages WHERE status = 'pending' AND scheduled_at <= datetime('now')`,
+      `SELECT * FROM scheduled_messages WHERE status = 'pending' AND scheduled_at <= ?`,
+      [nowStr],
       (err, rows) => {
         if (err) reject(err);
         else resolve((rows || []).map(r => ({ ...r, phones: JSON.parse(r.phones || '[]') })));
