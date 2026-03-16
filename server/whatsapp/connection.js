@@ -111,12 +111,17 @@ async function connectToWhatsApp() {
                 msg.message?.imageMessage?.caption ||
                 '';
 
-            if (body && remoteJid && !msg.key.fromMe && !remoteJid.includes('@g.us')) {
+            if (body && remoteJid && !remoteJid.includes('@g.us')) {
                 try {
+                    const isFromMe = !!msg.key.fromMe;
                     const existing = await getConversationByRemoteJid(remoteJid);
                     const isHistory = connectedAt && tsMs && tsMs < connectedAt;
 
-                    const conversation = await upsertConversation(remoteJid, body, tsMs || Date.now(), msg.pushName);
+                    // Para mensagens recebidas usamos upsertConversation (atualiza last_message e pushName).
+                    // Para mensagens enviadas pelo celular usamos upsertConversationForOutgoing.
+                    const conversation = isFromMe
+                        ? await upsertConversationForOutgoing(remoteJid, body, tsMs || Date.now())
+                        : await upsertConversation(remoteJid, body, tsMs || Date.now(), msg.pushName);
 
                     // Se a conversa foi criada a partir de histórico (antes da conexão),
                     // marcamos como não sendo cliente novo (para o assistente não automatizar).
@@ -125,10 +130,10 @@ async function connectToWhatsApp() {
                     }
 
                     await insertMessage(conversation.id, {
-                        direction: 'in',
+                        direction: isFromMe ? 'out' : 'in',
                         body,
                         timestampMs: tsMs || Date.now(),
-                        fromMe: false
+                        fromMe: isFromMe
                     });
                 } catch (dbErr) {
                     console.error('Erro ao registrar mensagem no banco:', dbErr);
