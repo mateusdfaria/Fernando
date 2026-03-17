@@ -10,6 +10,7 @@ const {
     upsertConversationForOutgoing,
     insertMessage
 } = require('../database');
+const fs = require('fs');
 
 // Adapter functions to match existing routes.js expectations
 const initWhatsApp = connectToWhatsApp;
@@ -50,6 +51,23 @@ async function sendTextMessage(to, text) {
     }
 }
 
+async function sendImageMessage(to, filePath, caption = '') {
+    const sock = getSocket();
+    if (!sock) {
+        throw new Error('WhatsApp não está conectado');
+    }
+
+    const jid = formatJid(to);
+    const buffer = fs.readFileSync(filePath);
+    const isVideo = filePath.endsWith('.mp4');
+
+    if (isVideo) {
+        await sock.sendMessage(jid, { video: buffer, caption });
+    } else {
+        await sock.sendMessage(jid, { image: buffer, caption });
+    }
+}
+
 async function sendMenu(to) {
     const service = getMenuService();
     const menuText = await service.generateMenuText();
@@ -57,11 +75,13 @@ async function sendMenu(to) {
 }
 
 module.exports = {
-  initWhatsApp,
-  isWhatsAppReady,
-  getCurrentQRCode,
-  disconnectWhatsApp,
-  getClient,
-  sendMenu,
-  sendTextMessage
+    initWhatsApp,
+    isWhatsAppReady,
+    getCurrentQRCode,
+    disconnectWhatsApp,
+    getClient,
+    sendMenu,
+    sendTextMessage,
+    sendImageMessage
 };
+

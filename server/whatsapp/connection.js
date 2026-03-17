@@ -5,11 +5,14 @@ const {
     default: makeWASocket,
     DisconnectReason,
     useMultiFileAuthState,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const QRCode = require('qrcode');
 const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const {
     upsertConversation,
     upsertConversationForOutgoing,
@@ -17,6 +20,34 @@ const {
     getConversationByRemoteJid,
     setConversationIsNewClient
 } = require('../database');
+
+// Pasta onde os arquivos de mídia serão salvos
+const MEDIA_DIR = path.join(__dirname, '..', 'uploads', 'media');
+if (!fs.existsSync(MEDIA_DIR)) {
+    fs.mkdirSync(MEDIA_DIR, { recursive: true });
+}
+
+// Detecta tipo de mídia e extensão da mensagem
+function getMediaInfo(msg) {
+    if (msg.message?.imageMessage) return { type: 'image', ext: 'jpg' };
+    if (msg.message?.audioMessage) return { type: 'audio', ext: 'ogg' };
+    if (msg.message?.videoMessage) return { type: 'video', ext: 'mp4' };
+    return null;
+}
+
+// Baixa mídia e salva em disco, retorna o nome do arquivo
+async function saveMediaToDisk(msg, type, ext) {
+    try {
+        const buffer = await downloadMediaMessage(msg, 'buffer', {});
+        if (!buffer || buffer.length === 0) return null;
+        const filename = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}.${ext}`;
+        fs.writeFileSync(path.join(MEDIA_DIR, filename), buffer);
+        return filename;
+    } catch (err) {
+        console.error(`Erro ao baixar mídia (${type}):`, err.message);
+        return null;
+    }
+}
 
 let sock = null;
 let currentQRCode = null;
@@ -110,21 +141,27 @@ async function connectToWhatsApp() {
                 msg.message?.extendedTextMessage?.text ||
                 msg.message?.imageMessage?.caption ||
                 '';
+            const mediaInfo = getMediaInfo(msg);
+            const hasContent = !!(body || mediaInfo);
 
-            if (body && remoteJid && !remoteJid.includes('@g.us')) {
+            if (hasContent && remoteJid && !remoteJid.includes('@g.us')) {
                 try {
                     const isFromMe = !!msg.key.fromMe;
                     const existing = await getConversationByRemoteJid(remoteJid);
                     const isHistory = connectedAt && tsMs && tsMs < connectedAt;
 
-                    // Para mensagens recebidas usamos upsertConversation (atualiza last_message e pushName).
-                    // Para mensagens enviadas pelo celular usamos upsertConversationForOutgoing.
-                    const conversation = isFromMe
-                        ? await upsertConversationForOutgoing(remoteJid, body, tsMs || Date.now())
-                        : await upsertConversation(remoteJid, body, tsMs || Date.now(), msg.pushName);
+                    // Baixar mídia se for mensagem de mídia
+                    let mediaFilename = null;
+                    if (mediaInfo) {
+                        mediaFilename = await saveMediaToDisk(msg, mediaInfo.type, mediaInfo.ext);
+                    }
 
-                    // Se a conversa foi criada a partir de histórico (antes da conexão),
-                    // marcamos como não sendo cliente novo (para o assistente não automatizar).
+                    const lastMsgPreview = body || (mediaInfo ? `[ ${mediaInfo.type} ]` : '');
+
+                    const conversation = isFromMe
+                        ? await upsertConversationForOutgoing(remoteJid, lastMsgPreview, tsMs || Date.now())
+                        : await upsertConversation(remoteJid, lastMsgPreview, tsMs || Date.now(), msg.pushName);
+
                     if (!existing && isHistory) {
                         await setConversationIsNewClient(conversation.id, false);
                     }
@@ -133,7 +170,9 @@ async function connectToWhatsApp() {
                         direction: isFromMe ? 'out' : 'in',
                         body,
                         timestampMs: tsMs || Date.now(),
-                        fromMe: isFromMe
+                        fromMe: isFromMe,
+                        mediaType: mediaInfo ? mediaInfo.type : null,
+                        mediaFilename
                     });
                 } catch (dbErr) {
                     console.error('Erro ao registrar mensagem no banco:', dbErr);

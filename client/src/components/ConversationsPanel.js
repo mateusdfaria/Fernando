@@ -25,6 +25,9 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [mediaFile, setMediaFile] = useState(null);
+  const [mediaPreview, setMediaPreview] = useState(null);
+  const [sendingMedia, setSendingMedia] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [categoryEdit, setCategoryEdit] = useState('');
@@ -109,7 +112,33 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
 
   const handleSendReply = async (e) => {
     e.preventDefault();
-    if (!replyText.trim() || !selectedConversation) return;
+    if (!selectedConversation) return;
+
+    // Se há arquivo de mídia, enviar como mídia
+    if (mediaFile) {
+      setSendingMedia(true);
+      try {
+        const formData = new FormData();
+        formData.append('media', mediaFile);
+        if (replyText.trim()) formData.append('caption', replyText.trim());
+        await axios.post(`${apiUrl}/conversations/${selectedConversation.id}/reply-media`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        setReplyText('');
+        setMediaFile(null);
+        setMediaPreview(null);
+        loadConversationMessages(selectedConversation);
+      } catch (err) {
+        console.error('Erro ao enviar mídia:', err);
+        alert('Erro ao enviar mídia: ' + (err.response?.data?.error || err.message));
+      } finally {
+        setSendingMedia(false);
+      }
+      return;
+    }
+
+    // Envio de texto normal
+    if (!replyText.trim()) return;
     try {
       await axios.post(`${apiUrl}/conversations/${selectedConversation.id}/reply`, {
         message: replyText.trim()
@@ -430,7 +459,30 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
                         msg.direction === 'out' ? 'message message-out' : 'message message-in'
                       }
                     >
-                      <div className="message-body">{msg.body}</div>
+                      <div className="message-body">
+                        {/* Exibir mídia se houver */}
+                        {msg.media_type === 'image' && msg.media_filename && (
+                          <a href={`${apiUrl}/media/${msg.media_filename}`} target="_blank" rel="noreferrer">
+                            <img
+                              src={`${apiUrl}/media/${msg.media_filename}`}
+                              alt="imagem"
+                              style={{ maxWidth: '240px', maxHeight: '300px', borderRadius: '8px', display: 'block', marginBottom: msg.body ? '6px' : 0 }}
+                            />
+                          </a>
+                        )}
+                        {msg.media_type === 'audio' && msg.media_filename && (
+                          <audio controls style={{ width: '100%', maxWidth: '280px' }}>
+                            <source src={`${apiUrl}/media/${msg.media_filename}`} />
+                          </audio>
+                        )}
+                        {msg.media_type === 'video' && msg.media_filename && (
+                          <video controls style={{ maxWidth: '240px', borderRadius: '8px' }}>
+                            <source src={`${apiUrl}/media/${msg.media_filename}`} />
+                          </video>
+                        )}
+                        {/* Texto / legenda */}
+                        {msg.body && <span>{msg.body}</span>}
+                      </div>
                       <div className="message-meta">
                         <span>{formatTime(msg.timestamp)}</span>
                         {msg.direction === 'out' && <span>Enviado por você</span>}
@@ -442,14 +494,47 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
             </div>
 
             <form className="conversation-reply" onSubmit={handleSendReply}>
-              <textarea
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Digite sua resposta..."
-              />
-              <button type="submit" disabled={!replyText.trim()}>
-                Enviar
-              </button>
+              {/* Preview da imagem selecionada */}
+              {mediaPreview && (
+                <div style={{ marginBottom: '8px', position: 'relative', display: 'inline-block' }}>
+                  <img src={mediaPreview} alt="preview" style={{ maxHeight: '120px', borderRadius: '8px', border: '2px solid #25d366' }} />
+                  <button
+                    type="button"
+                    onClick={() => { setMediaFile(null); setMediaPreview(null); }}
+                    style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#e53e3e', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '12px', lineHeight: '20px', textAlign: 'center' }}
+                  >×</button>
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+                {/* Botão de anexar arquivo */}
+                <label
+                  title="Enviar imagem ou vídeo"
+                  style={{ cursor: 'pointer', fontSize: '20px', lineHeight: '1', padding: '8px', color: '#25d366', flexShrink: 0 }}
+                >
+                  📎
+                  <input
+                    type="file"
+                    accept="image/*,video/mp4"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      setMediaFile(file);
+                      setMediaPreview(URL.createObjectURL(file));
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={mediaFile ? 'Legenda (opcional)...' : 'Digite sua resposta...'}
+                  style={{ flex: 1 }}
+                />
+                <button type="submit" disabled={(!replyText.trim() && !mediaFile) || sendingMedia} style={{ flexShrink: 0 }}>
+                  {sendingMedia ? 'Enviando...' : 'Enviar'}
+                </button>
+              </div>
             </form>
           </>
         ) : (

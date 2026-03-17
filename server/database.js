@@ -110,6 +110,8 @@ function createTables() {
       conversation_id INTEGER NOT NULL,
       direction TEXT NOT NULL, -- 'in' ou 'out'
       body TEXT,
+      media_type TEXT,       -- 'image', 'audio', 'video' ou NULL
+      media_filename TEXT,   -- nome do arquivo em uploads/media/ ou NULL
       timestamp DATETIME,
       from_me INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -147,6 +149,21 @@ function createTables() {
     console.log('Tabela scheduled_messages OK.');
 
     // Migração leve: adicionar colunas caso o banco já exista
+    db.all(`PRAGMA table_info(messages)`, (err, rows) => {
+      if (err) return;
+      const cols = rows || [];
+      const hasMediaType = cols.some((r) => r.name === 'media_type');
+      const hasMediaFilename = cols.some((r) => r.name === 'media_filename');
+      if (!hasMediaType) {
+        db.run(`ALTER TABLE messages ADD COLUMN media_type TEXT`);
+        console.log('Migração: coluna media_type adicionada à tabela messages.');
+      }
+      if (!hasMediaFilename) {
+        db.run(`ALTER TABLE messages ADD COLUMN media_filename TEXT`);
+        console.log('Migração: coluna media_filename adicionada à tabela messages.');
+      }
+    });
+
     db.all(`PRAGMA table_info(conversations)`, (err, rows) => {
       if (err) return;
       const cols = rows || [];
@@ -245,15 +262,15 @@ function upsertConversationForOutgoing(remoteJid, lastMessage, timestampMs) {
   });
 }
 
-function insertMessage(conversationId, { direction, body, timestampMs, fromMe }) {
+function insertMessage(conversationId, { direction, body, timestampMs, fromMe, mediaType = null, mediaFilename = null }) {
   return new Promise((resolve, reject) => {
     const ts = timestampMs ? new Date(timestampMs).toISOString() : null;
     db.run(
       `
-      INSERT INTO messages (conversation_id, direction, body, timestamp, from_me)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO messages (conversation_id, direction, body, media_type, media_filename, timestamp, from_me)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      [conversationId, direction, body, ts, fromMe ? 1 : 0],
+      [conversationId, direction, body || null, mediaType, mediaFilename, ts, fromMe ? 1 : 0],
       function (err) {
         if (err) {
           reject(err);
@@ -457,7 +474,7 @@ function getConversationMessages(conversationId) {
   return new Promise((resolve, reject) => {
     db.all(
       `
-      SELECT id, direction, body, timestamp, from_me
+      SELECT id, direction, body, media_type, media_filename, timestamp, from_me
       FROM messages
       WHERE conversation_id = ?
       ORDER BY timestamp ASC, id ASC

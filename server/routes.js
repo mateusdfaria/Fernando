@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const {
   getMenuOptions,
   addMenuOption,
@@ -26,7 +29,9 @@ const {
   getScheduledMessages,
   deleteScheduledMessage,
   getScheduledMessageById,
-  getUserByUsername
+  getUserByUsername,
+  upsertConversationForOutgoing,
+  insertMessage
 } = require('./database');
 const { authenticateToken, generateToken } = require('./middleware/auth');
 const bcrypt = require('bcrypt');
@@ -37,10 +42,39 @@ const {
   getCurrentQRCode,
   initWhatsApp,
   disconnectWhatsApp,
-  sendTextMessage
+  sendTextMessage,
+  sendImageMessage
 } = require('./whatsapp');
 
-// ── Autenticação ────────────────────────────────────────────────
+// Diretório de mídia
+const MEDIA_DIR = path.join(__dirname, 'uploads', 'media');
+if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
+
+// Configuração do multer para upload de imagens
+const upload = multer({
+  dest: MEDIA_DIR,
+  limits: { fileSize: 16 * 1024 * 1024 }, // 16 MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4'];
+    cb(null, allowed.includes(file.mimetype));
+  }
+});
+
+
+// ── Mídia pública ─────────────────────────────────────────────────────────────
+
+// Servir arquivos de mídia salvos em disco
+// Esta rota fica ANTES do middleware de auth para que o browser possa carregar imagens/áudios
+router.get('/media/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename); // previne path traversal
+  const filePath = path.join(MEDIA_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Arquivo não encontrado' });
+  }
+  res.sendFile(filePath);
+});
+
+// ── Autenticação ────────────────────────────────────────────────────────────
 
 // Login
 router.post('/auth/login', async (req, res) => {
@@ -234,6 +268,55 @@ router.post('/conversations/:id/reply', async (req, res) => {
     await sendTextMessage(conversation.remote_jid, message);
     res.json({ success: true });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Conversas - enviar mídia (imagem) pelo painel
+router.post('/conversations/:id/reply-media', upload.single('media'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const caption = req.body.caption || '';
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Arquivo de mídia é obrigatório' });
+    }
+
+    const conversation = await getConversationById(id);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversa não encontrada' });
+    }
+
+    if (!isWhatsAppReady()) {
+      return res.status(503).json({ error: 'WhatsApp não está conectado' });
+    }
+
+    // Renomear arquivo para ter extensão correta
+    const ext = req.file.mimetype.startsWith('video') ? 'mp4' : req.file.originalname.split('.').pop() || 'jpg';
+    const newFilename = `${Date.now()}_${require('crypto').randomBytes(6).toString('hex')}.${ext}`;
+    const newPath = path.join(MEDIA_DIR, newFilename);
+    fs.renameSync(req.file.path, newPath);
+
+    const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image';
+
+    // Enviar via WhatsApp
+    await sendImageMessage(conversation.remote_jid, newPath, caption);
+
+    // Registrar no banco
+    const now = Date.now();
+    const conv = await upsertConversationForOutgoing(conversation.remote_jid, caption || `[ ${mediaType} ]`, now);
+    await insertMessage(conv.id, {
+      direction: 'out',
+      body: caption || null,
+      timestampMs: now,
+      fromMe: true,
+      mediaType,
+      mediaFilename: newFilename
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao enviar mídia:', error);
     res.status(500).json({ error: error.message });
   }
 });
