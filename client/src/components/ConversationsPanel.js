@@ -28,6 +28,8 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(null);
   const [sendingMedia, setSendingMedia] = useState(false);
+  const [showDetail, setShowDetail] = useState(false); // mobile: false=lista, true=detalhe
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [categoryEdit, setCategoryEdit] = useState('');
@@ -81,6 +83,7 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
       setCategoryEdit(res.data.conversation.category || '');
       setNameEdit(res.data.conversation.name || '');
       setAssistantEnabled(res.data.conversation.assistant_enabled !== 0);
+      setShowDetail(true); // mobile: navegar para o detalhe
 
       // Marcar como lida
       await axios.post(`${apiUrl}/conversations/${conversation.id}/read`);
@@ -92,6 +95,7 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
       setLoadingMessages(false);
     }
   };
+
 
   const loadConversationsSilent = async () => {
     try {
@@ -281,7 +285,7 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
   });
 
   return (
-    <div className="conversations-panel">
+    <div className={`conversations-panel${showDetail ? ' mobile-show-detail' : ''}`}>
       <div className="conversations-list">
         <div className="conversations-header">
           <h2>Conversas</h2>
@@ -361,6 +365,15 @@ function ConversationsPanel({ apiUrl, initialConversation, onClearInitialConvers
         {selectedConversation ? (
           <>
             <div className="conversation-detail-header">
+              {/* Botão Voltar para mobile */}
+              <button
+                className="btn-back-mobile"
+                onClick={() => setShowDetail(false)}
+                type="button"
+                title="Voltar para lista"
+              >
+                ← Voltar
+              </button>
               <div>
                 <h2>
                   {selectedConversation.name
