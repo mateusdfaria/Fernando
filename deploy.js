@@ -2,13 +2,13 @@ const { NodeSSH } = require('node-ssh');
 const ssh = new NodeSSH();
 
 async function deploy() {
-    const tryConnect = async (user, useKey) => {
+    const tryConnect = async (user, password) => {
         try {
-            console.log(`Connecting as ${user} using ${useKey ? 'key' : 'password'}...`);
+            console.log(`Connecting as ${user}...`);
             await ssh.connect({
                 host: '92.246.129.31',
                 username: user,
-                ...(useKey ? { privateKeyPath: 'Fernando-servidor.ppk' } : { password: 'C7vVu5qOt6ZL12z7' }),
+                password,
                 readyTimeout: 10000
             });
             console.log(`SUCCESS connected as ${user}!`);
@@ -19,16 +19,16 @@ async function deploy() {
         }
     };
 
-    const methods = [
-        { u: 'ubuntu', k: true },
-        { u: 'ubuntu', k: false },
-        { u: 'debian', k: true },
-        { u: 'bonsai', k: false }
+    const attempts = [
+        { u: 'ubuntu', p: 'C7vVu5qOt6ZL12z7' },
+        { u: 'bonsai', p: 'C7vVu5qOt6ZL12z7' },
+        { u: 'root', p: 'C7vVu5qOt6ZL12z7' },
+        { u: 'debian', p: 'C7vVu5qOt6ZL12z7' },
     ];
 
-    for (let m of methods) {
-        if (await tryConnect(m.u, m.k)) {
-            console.log('Executing commands...');
+    for (let m of attempts) {
+        if (await tryConnect(m.u, m.p)) {
+            console.log('Executando git pull e pm2 restart...');
             const result = await ssh.execCommand('cd Fernando && git pull origin main && pm2 restart all');
             console.log('STDOUT:', result.stdout);
             console.log('STDERR:', result.stderr);
@@ -37,7 +37,7 @@ async function deploy() {
         }
     }
 
-    console.log('All login attempts failed.');
+    console.log('Todas as tentativas de login falharam.');
     process.exit(1);
 }
 

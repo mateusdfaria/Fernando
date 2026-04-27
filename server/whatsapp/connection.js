@@ -3,6 +3,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const {
     default: makeWASocket,
+    Browsers,
     DisconnectReason,
     useMultiFileAuthState,
     fetchLatestBaileysVersion,
@@ -52,14 +53,33 @@ async function saveMediaToDisk(msg, type, ext) {
 let sock = null;
 let currentQRCode = null;
 let isReady = false;
+let isConnecting = false;
 let connectedAt = null; // timestamp (ms) da última conexão bem-sucedida
 
 // Logger configuration
 const logger = pino({ level: 'info' });
 
 async function connectToWhatsApp() {
-    const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info');
-    const { version } = await fetchLatestBaileysVersion();
+    // Evita conexões concorrentes que podem invalidar o QR/pairing
+    if (sock || isConnecting) {
+        return sock;
+    }
+
+    isConnecting = true;
+
+    let state;
+    let saveCreds;
+    let version;
+    try {
+        const authState = await useMultiFileAuthState('baileys_auth_info');
+        state = authState.state;
+        saveCreds = authState.saveCreds;
+        const latest = await fetchLatestBaileysVersion();
+        version = latest.version;
+    } catch (err) {
+        isConnecting = false;
+        throw err;
+    }
 
     console.log(`Usando Baileys v${version.join('.')}`);
 
@@ -67,7 +87,8 @@ async function connectToWhatsApp() {
         version,
         logger,
         auth: state,
-        browser: ['Bonsai Shop', 'Chrome', '1.0.0'],
+        browser: Browsers.ubuntu('Chrome'),
+        printQRInTerminal: true,
         // Habilitar sincronização de mais histórico (ainda assim, limitado pelo WhatsApp)
         syncFullHistory: true
     });
@@ -88,8 +109,10 @@ async function connectToWhatsApp() {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('Conexão fechada devido a ', lastDisconnect.error, ', reconectando ', shouldReconnect);
             isReady = false;
+            isConnecting = false;
             currentQRCode = null;
             connectedAt = null;
+            sock = null;
 
             if (shouldReconnect) {
                 connectToWhatsApp();
@@ -116,6 +139,7 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             console.log('Conectado ao WhatsApp com sucesso!');
             isReady = true;
+            isConnecting = false;
             currentQRCode = null;
             connectedAt = Date.now();
         }
@@ -232,6 +256,7 @@ async function disconnect() {
         sock.end(undefined);
         sock = null;
         isReady = false;
+        isConnecting = false;
         currentQRCode = null;
         connectedAt = null;
         console.log('Desconectado manualmente.');
