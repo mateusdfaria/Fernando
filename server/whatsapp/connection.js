@@ -14,6 +14,9 @@ const QRCode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+
+// Caminho absoluto para a pasta de autenticação (evita problemas de cwd)
+const AUTH_FOLDER = path.join(__dirname, '..', '..', 'baileys_auth_info');
 const {
     upsertConversation,
     upsertConversationForOutgoing,
@@ -55,6 +58,11 @@ let currentQRCode = null;
 let isReady = false;
 let isConnecting = false;
 let connectedAt = null; // timestamp (ms) da última conexão bem-sucedida
+let connectionState = 'idle'; // idle | connecting | qr | open | close | reconnecting | error
+let lastError = null;
+let lastDisconnectCode = null;
+let qrGeneratedAt = null;
+let lastConnectionUpdateAt = null;
 
 // Logger configuration
 const logger = pino({ level: 'info' });
@@ -66,22 +74,39 @@ async function connectToWhatsApp() {
     }
 
     isConnecting = true;
+    connectionState = 'connecting';
+    lastError = null;
+    lastDisconnectCode = null;
+    lastConnectionUpdateAt = Date.now();
 
     let state;
     let saveCreds;
     let version;
     try {
-        const authState = await useMultiFileAuthState('baileys_auth_info');
+        if (!fs.existsSync(AUTH_FOLDER)) {
+            fs.mkdirSync(AUTH_FOLDER, { recursive: true });
+        }
+        const authState = await useMultiFileAuthState(AUTH_FOLDER);
         state = authState.state;
         saveCreds = authState.saveCreds;
-        const latest = await fetchLatestBaileysVersion();
-        version = latest.version;
     } catch (err) {
         isConnecting = false;
+        connectionState = 'error';
+        lastError = err?.message || 'Erro ao inicializar autenticação do WhatsApp';
+        lastConnectionUpdateAt = Date.now();
         throw err;
     }
 
-    console.log(`Usando Baileys v${version.join('.')}`);
+    // Tenta buscar a versão mais recente do Baileys; usa fallback se falhar
+    try {
+        const latest = await fetchLatestBaileysVersion();
+        version = latest.version;
+        console.log(`Usando Baileys v${version.join('.')} (online)`);
+    } catch (err) {
+        version = [2, 3000, 1015901307]; // Versão estável conhecida
+        console.warn('Não foi possível buscar versão do Baileys online. Usando fallback:', version.join('.'));
+    }
+
 
     sock = makeWASocket({
         version,
@@ -95,22 +120,33 @@ async function connectToWhatsApp() {
 
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
+        lastConnectionUpdateAt = Date.now();
 
         if (qr) {
             console.log('Novo QR Code gerado');
+            connectionState = 'qr';
+            qrGeneratedAt = Date.now();
             try {
                 currentQRCode = await QRCode.toDataURL(qr);
             } catch (err) {
                 console.error('Erro ao gerar QR Code imagem:', err);
+                connectionState = 'error';
+                lastError = err?.message || 'Erro ao gerar QR Code';
             }
         }
 
         if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Conexão fechada devido a ', lastDisconnect.error, ', reconectando ', shouldReconnect);
+            const disconnectCode = (lastDisconnect?.error)?.output?.statusCode || null;
+            const disconnectMessage = (lastDisconnect?.error)?.message || 'Conexão fechada';
+            const shouldReconnect = disconnectCode !== DisconnectReason.loggedOut;
+            console.log('Conexão fechada devido a ', lastDisconnect?.error, ', reconectando ', shouldReconnect);
             isReady = false;
             isConnecting = false;
+            connectionState = shouldReconnect ? 'reconnecting' : 'close';
+            lastDisconnectCode = disconnectCode;
+            lastError = disconnectMessage;
             currentQRCode = null;
+            qrGeneratedAt = null;
             connectedAt = null;
             sock = null;
 
@@ -122,12 +158,15 @@ async function connectToWhatsApp() {
 
                 // Clear state
                 isReady = false;
+                isConnecting = false;
+                connectionState = 'connecting';
                 currentQRCode = null;
+                qrGeneratedAt = null;
                 sock = null;
 
                 // Nuke the auth folder to force fresh login
                 try {
-                    fs.rmSync('baileys_auth_info', { recursive: true, force: true });
+                    fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
                     console.log('✅ Pasta de credenciais limpa.');
                 } catch (err) {
                     console.error('Erro ao limpar pasta de credenciais:', err);
@@ -140,7 +179,11 @@ async function connectToWhatsApp() {
             console.log('Conectado ao WhatsApp com sucesso!');
             isReady = true;
             isConnecting = false;
+            connectionState = 'open';
+            lastError = null;
+            lastDisconnectCode = null;
             currentQRCode = null;
+            qrGeneratedAt = null;
             connectedAt = Date.now();
         }
     });
@@ -246,6 +289,20 @@ function isConnected() {
     return isReady;
 }
 
+function getConnectionStatus() {
+    return {
+        ready: isReady,
+        connecting: isConnecting,
+        state: connectionState,
+        hasQRCode: !!currentQRCode,
+        qrGeneratedAt,
+        connectedAt,
+        lastDisconnectCode,
+        lastError,
+        updatedAt: lastConnectionUpdateAt
+    };
+}
+
 async function disconnect() {
     if (sock) {
         try {
@@ -257,8 +314,13 @@ async function disconnect() {
         sock = null;
         isReady = false;
         isConnecting = false;
+        connectionState = 'idle';
+        lastError = null;
+        lastDisconnectCode = null;
         currentQRCode = null;
+        qrGeneratedAt = null;
         connectedAt = null;
+        lastConnectionUpdateAt = Date.now();
         console.log('Desconectado manualmente.');
     }
 }
@@ -268,5 +330,6 @@ module.exports = {
     getSocket,
     getQRCode,
     isConnected,
+    getConnectionStatus,
     disconnect
 };
